@@ -22,35 +22,51 @@ class BaseEvaluator(object):
 class BinaryEvaluator(BaseEvaluator):
     """
     For binary classification problem, generate common evaluation metrics
-    and plots which are useful to determine the threshold.
+    and plots which are useful to evaluate your model performance and 
+    determine the threshold.
     """
-    def __init__(self, model, eval_X, eval_y, threshold=0.5):
+    def __init__(self):
         super(BaseEvaluator,self).__init__()
-        self.model = model
-        self.eval_X = eval_X
-        self.eval_y = eval_y
-        self.threshold = threshold 
-    def evaluate(self, metrics = "all"):
+        
+        
+    def evaluate(self, model, eval_X, eval_y, threshold=0.5, metrics = "all"):
         """Make prediction and evaluate"""
-        pred = self.model.predict(self.eval_X)
-        if metrics == "base" or metrics == "all":
-            print("Model Evluation")
-            print("The accuracy is %0.003f" % (accuracy_score(pred, self.eval_y)))
-            print("The recall for 1 is %0.3f" % (recall_score(self.eval_y, pred, pos_label=1)))
-            print("The precision for 1 is %0.3f" % (precision_score(self.eval_y, pred, pos_label=1)))
-            print("The F1-score is %0.3f" % f1_score(self.eval_y, pred, pos_label=1))
-            print("Confusion Matrics")
-            y_true = pd.Series(self.eval_y)
-            y_pred = pd.Series(pred)
-            confusion = pd.crosstab(y_true, y_pred, rownames=['True'], colnames=['Predicted'], margins=True)
+        if isinstance(eval_X, pd.DataFrame):
+            eval_X = eval_X.values
+            X_cols = X.columns
+        y_probs = model.predict_proba(eval_X)[:, 1]
+        if threshold == 0.5:
+            pred = model.predict(eval_X)
+        else:
+            pred = np.where(y_probs>threshold, 1, 0)       
+        accuracy  = accuracy_score(pred, eval_y)
+        recall_1    = recall_score(eval_y, pred, pos_label=1)
+        precision_1 = precision_score(eval_y, pred, pos_label=1)
+        recall_0    = recall_score(eval_y, pred, pos_label=0)
+        precision_0 = precision_score(eval_y, pred, pos_label=0)
+        f1        = f1_score(eval_y, pred, pos_label=1)
+        auc       = roc_auc_score(eval_y, y_probs)
+        y_true = pd.Series(eval_y)
+        y_pred = pd.Series(pred)
+        confusion = pd.crosstab(y_true, y_pred, rownames=['True'], colnames=['Predicted'], margins=True)
+        if metrics == "basic" or metrics == "all":
+            print("---Model Evluation---")
+            print("The accuracy is %0.4f" % accuracy)
+            print("The recall for 1 is %0.4f" % recall_1)
+            print("The precision for 1 is %0.4f" % precision_1)
+            print("The recall for 0 is %0.4f" % recall_0)
+            print("The precision for 0 is %0.4f" % precision_0)
+            print("The F1-score is %0.4f" % f1)
+            print("The ROC-AUC is %0.4f" % auc)
+            print("\n---Confusion Matrics---")
             print(confusion)
         if metrics == "all":
             # AUC
-            y_probs = self.model.predict_proba(self.eval_X)[:, 1]
-            fpr, tpr, auc_thresholds = roc_curve(self.eval_y, y_probs)
-            precisions, recalls, thresholds = precision_recall_curve(self.eval_y, y_probs)
+            fpr, tpr, auc_thresholds = roc_curve(eval_y, y_probs)
+            precisions, recalls, thresholds = precision_recall_curve(eval_y, y_probs)
             # ROC
-            fig = plt.figure(figsize=(10, 20))
+            fig = plt.figure(figsize=(10, 27))
+            plt.subplots_adjust(hspace=0.3)
             ax1 = fig.add_subplot(411)
             ax1.set_title('ROC Curve')
             ax1.plot(fpr, tpr, linewidth=2)
@@ -72,17 +88,29 @@ class BinaryEvaluator(BaseEvaluator):
             # Class Probability Distribution
             ax3 = fig.add_subplot(413)
             ax3.set_title('Class Probability Distribution')
-            buy = ax3.hist(y_probs[self.eval_y == 1][:, 1], bins=40,
+            ax3.set_ylabel('Density')
+            ax3.set_xlabel('Predicted Probability')
+            ax3.hist(y_probs[eval_y == 1], bins=40,
                            density=True, alpha=0.5)
-            nonbuy = ax3.hist(y_probs[self.eval_y == 0][:, 1], bins=40,
+            ax3.hist(y_probs[eval_y == 0], bins=40,
                               density=True, alpha=0.5)
             # Feature importance
-            if ("RandomForest" or "XGB") in str(type(self.model)): 
+            if ("RandomForest" or "XGB" or "LGBM") in str(type(model)): 
                 ax4 = fig.add_subplot(414)
                 ax4.set_title('Feature Imprtance')
-                feature_importance = self.model.feature_importances_
-                pd.Series(feature_importance, index=["0",'1','2','3']).nlargest(self.eval_X.shape[1]).plot(kind='barh')
-
+                feature_importance = model.feature_importances_
+                try:
+                    X_cols
+                except:
+                    pd.Series(feature_importance, index=range(eval_X.shape[1])).nlargest(eval_X.shape[1]).plot(kind='barh')
+                    ax4.set_ylabel('Column Index')
+                else:
+                    pd.Series(feature_importance, index=X_cols).nlargest(eval_X.shape[1]).plot(kind='barh')
+                    
+    def find_threshold(self):
+        pass
+    def save_result(self, path='./', name="result.txt"):
+        pass
 #             # Save the plots
 #             plot_path = eval_path + 'multiple_metrics_plot.png'
 #             fig.savefig(
@@ -113,4 +141,3 @@ class BinaryEvaluator(BaseEvaluator):
 #             result_path = eval_path + 'output.txt'
 #             with open(result_path, 'w+') as f:
 #                 f.write(output)
-
