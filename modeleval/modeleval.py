@@ -13,7 +13,7 @@ from sklearn.metrics import (
 
 class BaseEvaluator(object):
     """
-    Take a base model object, generate model evaluation result on test data.
+    A base evaluator object, generate model evaluation result on test data.
     Accepted models are base model in sklearn, xgboost, lightgbm and catboost.
     """
     def __init__(self):
@@ -38,7 +38,31 @@ class BinaryEvaluator(BaseEvaluator):
 
         
     def evaluate(self, model, eval_X, eval_y, threshold=0.5, metrics = "all", save=False, save_folder="result"):
-        """Make prediction and evaluation based on specified threshold"""
+        """Make prediction and evaluation based on specified threshold.
+
+        Parameters
+        ----------
+        model : sklearn/lightgbm/xgboost/catboost classification model object
+            The model for evaluation.
+
+        eval_X : ndarray or pd.DataFrame
+            The test data's features.
+
+        eval_y : ndarray
+            The test data's labels.
+
+        metrics : string, optional (default="all")
+            The metrics for evaluating the model. If "base", return only common metrics. If "all", return
+            plots including ROC curve, Precision_Recall vs threshold, class probability distribution and
+            feature importance as well.
+
+        save : bool, optional (default=False)
+            Whether to save the result.
+
+        save_folder : string (default="result")
+            The folder path to save the result, default is the result folder in the current directory.
+
+        """
         if isinstance(eval_X, pd.DataFrame):
             eval_X = eval_X.values
             X_cols = X.columns
@@ -67,12 +91,13 @@ class BinaryEvaluator(BaseEvaluator):
             print("The precision for 0 is %0.4f" % precision_0)
             print("The F1-score is %0.4f" % f1)
             print("The ROC-AUC is %0.4f" % roc_auc)
-            print("\n---Confusion Matrics---")
+            print("\n---Confusion Matrix---")
             print(confusion)
         if metrics == "all":
             # AUC
             fpr, tpr, auc_thresholds = roc_curve(eval_y, y_probs)
             precisions, recalls, thresholds = precision_recall_curve(eval_y, y_probs)
+
             # ROC
             fig = plt.figure(figsize=(10, 27))
             plt.subplots_adjust(hspace=0.25)
@@ -120,10 +145,11 @@ class BinaryEvaluator(BaseEvaluator):
         if save:
             super(BinaryEvaluator, self).ensure_path(save_folder)
             plot_path = save_folder + 'multiple_metrics_plots.png'
-            fig.savefig(
-                plot_path,
-                bbox_inches='tight'
-            )
+            if fig:
+                fig.savefig(
+                    plot_path,
+                    bbox_inches='tight'
+                )
             #Write result into a txt
             output = '\n'.join([
                 '--Model Evaluation--',
@@ -153,4 +179,17 @@ class BinaryEvaluator(BaseEvaluator):
             
 
     def find_threshold(self, start=0, stop=1, step=0.1):
-        """show the result of common metrics of the threshold within a given interval """
+        """show the result of common metrics of the threshold within a given interval.
+
+        Parameters
+        ----------
+        start : int or float
+            The start point of the threshold.
+
+        end : int or float
+            The end point of the threshold.
+
+        step: float
+            The increment step of the threshold.
+        """
+        pass
