@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import os
 import matplotlib.pyplot as plt
 plt.style.use("ggplot")
 from sklearn.metrics import (
@@ -17,6 +18,13 @@ class BaseEvaluator(object):
     """
     def __init__(self):
         pass
+    
+    
+    def ensure_path(self, file_path):
+        """Helper function to create/ensure the path"""
+        directory = os.path.dirname(file_path)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
 
 
 class BinaryEvaluator(BaseEvaluator):
@@ -26,11 +34,11 @@ class BinaryEvaluator(BaseEvaluator):
     determine the threshold.
     """
     def __init__(self):
-        super(BaseEvaluator,self).__init__()
+        super(BinaryEvaluator, self).__init__()
+
         
-        
-    def evaluate(self, model, eval_X, eval_y, threshold=0.5, metrics = "all"):
-        """Make prediction and evaluate"""
+    def evaluate(self, model, eval_X, eval_y, threshold=0.5, metrics = "all", save=False, save_folder="result"):
+        """Make prediction and evaluation based on specified threshold"""
         if isinstance(eval_X, pd.DataFrame):
             eval_X = eval_X.values
             X_cols = X.columns
@@ -45,19 +53,20 @@ class BinaryEvaluator(BaseEvaluator):
         recall_0    = recall_score(eval_y, pred, pos_label=0)
         precision_0 = precision_score(eval_y, pred, pos_label=0)
         f1        = f1_score(eval_y, pred, pos_label=1)
-        auc       = roc_auc_score(eval_y, y_probs)
+        roc_auc       = roc_auc_score(eval_y, y_probs)
         y_true = pd.Series(eval_y)
         y_pred = pd.Series(pred)
         confusion = pd.crosstab(y_true, y_pred, rownames=['True'], colnames=['Predicted'], margins=True)
         if metrics == "basic" or metrics == "all":
-            print("---Model Evluation---")
+            print("Evaluation result of Threshold=={thres}".format(thres=threshold))
+            print("---Common Metrics---")
             print("The accuracy is %0.4f" % accuracy)
             print("The recall for 1 is %0.4f" % recall_1)
             print("The precision for 1 is %0.4f" % precision_1)
             print("The recall for 0 is %0.4f" % recall_0)
             print("The precision for 0 is %0.4f" % precision_0)
             print("The F1-score is %0.4f" % f1)
-            print("The ROC-AUC is %0.4f" % auc)
+            print("The ROC-AUC is %0.4f" % roc_auc)
             print("\n---Confusion Matrics---")
             print(confusion)
         if metrics == "all":
@@ -66,7 +75,7 @@ class BinaryEvaluator(BaseEvaluator):
             precisions, recalls, thresholds = precision_recall_curve(eval_y, y_probs)
             # ROC
             fig = plt.figure(figsize=(10, 27))
-            plt.subplots_adjust(hspace=0.3)
+            plt.subplots_adjust(hspace=0.25)
             ax1 = fig.add_subplot(411)
             ax1.set_title('ROC Curve')
             ax1.plot(fpr, tpr, linewidth=2)
@@ -94,8 +103,10 @@ class BinaryEvaluator(BaseEvaluator):
                            density=True, alpha=0.5)
             ax3.hist(y_probs[eval_y == 0], bins=40,
                               density=True, alpha=0.5)
+            
             # Feature importance
-            if ("RandomForest" or "XGB" or "LGBM") in str(type(model)): 
+            model_list = ["DecisionTree","RandomForest", "XGB", "LGBM"]
+            if any(mod_name in str(type(model)) for mod_name in model_list): 
                 ax4 = fig.add_subplot(414)
                 ax4.set_title('Feature Imprtance')
                 feature_importance = model.feature_importances_
@@ -106,38 +117,40 @@ class BinaryEvaluator(BaseEvaluator):
                     ax4.set_ylabel('Column Index')
                 else:
                     pd.Series(feature_importance, index=X_cols).nlargest(eval_X.shape[1]).plot(kind='barh')
-                    
-    def find_threshold(self):
-        pass
-    def save_result(self, path='./', name="result.txt"):
-        pass
-#             # Save the plots
-#             plot_path = eval_path + 'multiple_metrics_plot.png'
-#             fig.savefig(
-#                 plot_path,
-#                 bbox_inches='tight'
-#             )
+        if save:
+            super(BinaryEvaluator, self).ensure_path(save_folder)
+            plot_path = save_folder + 'multiple_metrics_plots.png'
+            fig.savefig(
+                plot_path,
+                bbox_inches='tight'
+            )
+            #Write result into a txt
+            output = '\n'.join([
+                '--Model Evaluation--',
+                '\tAccuracy: {accuracy:.4f}',
+                '\tRecall for 1: {recall_1:.4f}',
+                '\tPrecision for 1: {precision_1:.4f}',
+                '\tRecall for 0: {recall_0:.4f}',
+                '\tPrecision for 0: {precision_0:.4f}',
+                '\tF1 score: {f1:.4f}',
+                '\tROC-AUC: {roc_auc:.4f}',
+                '\n',
+                '--Confusion Matrix--',
+                '{confusion}'
+            ]).format(
+                accuracy = accuracy,
+                recall_1 = recall_1,
+                precision_1 = precision_1,
+                recall_0 = recall_0,
+                precision_0 = precision_0,
+                f1 = f1,
+                roc_auc = roc_auc,
+                confusion = confusion
+            )
+            result_path = save_folder + 'output.txt'
+            with open(result_path, 'w+') as f:
+                f.write(output)
+            
 
-#             # Write result into a txt
-#             output = '\n'.join([
-#                 'Model Evaluation:',
-#                 '\tAccuracy: {accuracy:.3f}',
-#                 '\tRecall for monetizers: {recall:.3f}',
-#                 '\tPrecision for monetizers: {precision:.3f}',
-#                 '\tF1 score: {f1:.3f}',
-#                 '\tAUC: {auc:.3f}',
-#                 '\n',
-#                 'Confusion Matrix:',
-#                 '{confusion}'
-#             ]).format(
-#                 accuracy  = accuracy_score(prediction, y_test),
-#                 recall    = recall_score(y_test, prediction, pos_label=1),
-#                 precision = precision_score(y_test, prediction, pos_label=1),
-#                 f1        = f1_score(y_test, prediction, pos_label=1),
-#                 auc       = auc(fpr, tpr),
-#                 confusion = confusion.to_csv(
-#                     sep=' ', index=True, header=True, index_label='Confusion')
-#             )
-#             result_path = eval_path + 'output.txt'
-#             with open(result_path, 'w+') as f:
-#                 f.write(output)
+    def find_threshold(self, start=0, stop=1, step=0.1):
+        """show the result of common metrics of the threshold within a given interval """
