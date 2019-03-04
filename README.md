@@ -12,7 +12,7 @@ There are currently only two `evaluator` objects, `BinaryEvaluator` and `Regress
 
 * `BinaryEvaluator()`: Generate useful metrics and plots for a binary classification model based on the threshold. Metrics include accuracy, recall and precision for two groups, F1 score, roc-auc, confusion matrix. Plots include ROC curve, Precision_Recall vs threshold, class probability distribution and feature importance if it can be obtained from the model. Also you can use the `find_threshold` method to generate metrics for different threshold to find the best for your purpose.
 
-* `RegressionEvaluator()`: Similar as above but for regression model. Metrics includes MSE, RMSE, Mean/Median Absolute Error , Explained Variance Score ($R^2$). Plot includes residuals vs predicted values plot.
+* `RegressionEvaluator()`: Similar as above but for regression model. Metrics includes MSE, RMSE, Mean/Median Absolute Error, Explained Variance Score ![#r2](https://latex.codecogs.com/gif.latex?R%5E2). Plot includes residuals vs predicted values plot.
 
 All evaluator result can be saved.
 
