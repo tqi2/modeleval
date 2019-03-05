@@ -133,7 +133,7 @@ class BinaryEvaluator(BaseEvaluator):
             model_list = ["DecisionTree","RandomForest", "XGB", "LGBM"]
             if any(mod_name in str(type(model)) for mod_name in model_list): 
                 ax4 = fig.add_subplot(414)
-                ax4.set_title('Feature Imprtance')
+                ax4.set_title('Feature Importance')
                 feature_importance = model.feature_importances_
                 try:
                     X_cols
