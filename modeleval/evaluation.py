@@ -122,10 +122,10 @@ class RegressionEvaluator(BaseEvaluator):
         print("Evaluation Result")
         print("---Common Metrics---")
         print("The mse is %0.4f" % self.mse)
-        print("The mae for 1 is %0.4f" % self.mae)
-        print("The rmse for 1 is %0.4f" % self.rmse)
-        print("The rmsle for 0 is %0.4f" % self.rmsle)
-        print("The r-square for 0 is %0.4f" % self.r2)
+        print("The mae is %0.4f" % self.mae)
+        print("The rmse is %0.4f" % self.rmse)
+        print("The rmsle is %0.4f" % self.rmsle)
+        print("The r-square is %0.4f" % self.r2)
         if plot:
             fig = self.res_fit_plot()
         if save:
