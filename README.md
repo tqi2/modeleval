@@ -19,7 +19,7 @@ All evaluators' result can be saved to given path.
 
 ## Usage
 
-Here is a [example](./example/binary_classification_examples.ipynb) to show the basic usage of `BinaryEvaluator()` and [example](./example/regression_examples.ipynb) for `RegressionEvaluator()`.
+Here is a [example](./example/binary_classification_example.ipynb) to show the basic usage of `BinaryEvaluator()` and [example](./example/regression_example.ipynb) for `RegressionEvaluator()`.
 
 ## Installation
 
