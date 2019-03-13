@@ -1,6 +1,7 @@
 # modeleval
 
-A python package for machine learning model's evaluation, fully compatible ***scikit-learn***, ***xgboost***, ***LightGBM*** and ***catboost API***. 
+A python package that generates detailed machine learning model evaluation and comparsion, fully compatible
+***scikit-learn***, ***xgboost***, ***LightGBM*** and ***catboost API***. 
 
 By <a href="https://tqi2.github.io/">Tian Qi</a>.
 
