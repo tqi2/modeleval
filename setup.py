@@ -5,7 +5,7 @@ with open('requirements.txt') as fp:
 
 setup(
     name='modeleval',
-    version='0.1dev',
+    version='0.1.0',
     url='https://github.com/tqi2/model-evaluation',
     license='MIT',
     packages=find_packages(),
