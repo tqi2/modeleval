@@ -28,4 +28,11 @@ You can just install the package via:
 ```bash
 $ pip install modeleval
 ```
+or upgrade to the latest version:
+
+
+```bash
+$ pip install -U modeleval
+```
+
 
