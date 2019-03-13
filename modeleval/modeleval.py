@@ -24,6 +24,8 @@ class BaseEvaluator(object):
 
 class RegressionEvaluator(BaseEvaluator):
     """
+    For regression problem, generate common evaluation metrics
+    and plots which are useful to evaluate your model performance
     """
     def __init__(self):
         super(RegressionEvaluator, self).__init__()
@@ -31,6 +33,20 @@ class RegressionEvaluator(BaseEvaluator):
     
     def get_rmsle(self, predicted, real):
         """Calculate Root Mean Squared Logarithmic Error (RMSLE)
+        
+        Parameters
+        ----------
+        predicted : 
+
+        real : ndarray
+            The real response.
+
+        eval_y : ndarray
+            The predicted response.
+        
+        Returns
+        -------
+        rmsle : float 
         """
         sum=0.0
         for x in range(len(predicted)):
@@ -41,7 +57,7 @@ class RegressionEvaluator(BaseEvaluator):
     
     
     def get_metrics(self, model, eval_X, eval_y):
-        """Calculate common metrics for regression problem
+        """Calculate common metrics for regression problem.
         
         Parameters
         ----------
@@ -52,10 +68,7 @@ class RegressionEvaluator(BaseEvaluator):
             The test data's features.
 
         eval_y : ndarray
-            The test data's labels.
-            
-        return :
-        
+            The test data's response.
         """
         self.model = model
         self.eval_y = eval_y
@@ -82,6 +95,29 @@ class RegressionEvaluator(BaseEvaluator):
         return plt
     
     def evaluate(self, model, eval_X, eval_y, plot=True, save=False, save_folder="result"):
+        """Make prediction and generate evaluation report.
+
+        Parameters
+        ----------
+        model : sklearn/lightgbm/xgboost/catboost regression model object
+            The model for evaluation.
+
+        eval_X : ndarray or pd.DataFrame
+            The test data's features.
+
+        eval_y : ndarray
+            The test data's response.
+
+        plot : bool (default=True)
+            If "Flase", return only common metrics. If "True", return the 
+            residual vs fitted values plot as well.
+
+        save : bool (default=False)
+            Save the result to path if True.
+
+        save_folder : string (default="result")
+            The folder path to save the result, default is the result folder in the current directory.
+        """
         self.get_metrics(model, eval_X, eval_y)
         print("Evaluation Result")
         print("---Common Metrics---")
@@ -121,7 +157,27 @@ class RegressionEvaluator(BaseEvaluator):
                 f.write(output)
             
     
-    def find_best_model(self, models, eval_X=None, eval_y=None, objective=None):
+    def find_best_model(self, models, eval_X=None, eval_y=None, objective="mse"):
+        """Find the best model with the specified objective metric.
+
+        Parameters
+        ----------
+        models : list 
+            List of sklearn/lightgbm/xgboost/catboost regression model.
+            
+        eval_X : ndarray or pd.DataFrame
+            The test data's features.
+
+        eval_y : ndarray
+            The test data's response.
+        
+        objective: string (default="mse")
+            The objective metric.
+            
+        Returns
+        -------
+        A single model object.       
+        """
         result = np.array([])
         for model in models:
             y_pred = model.predict(eval_X)
@@ -135,12 +191,12 @@ class RegressionEvaluator(BaseEvaluator):
                 result = np.append(result, self.rmsle(y_pred, eval_y))
             if objective == "r2":
                 result = np.append(result, r2_score(eval_y, y_pred))
-                print("The model with minimum %s (%s) is the %s th model" % (objective, result[result.argmin()],result.argmin()+1))
-                return models[result.argmin()]
-            if objective != "r2":
-                print("The model with minimum %s (%s) is the %s th model" % (objective, result[result.argmin()],result.argmin()+1))
-                return models[result.argmax()]
-
+        if objective == "r2":
+            print("The model with maximum r-square (%s) is the %s th model" % (result[result.argmin()], result.argmin()+1))
+            return models[result.argmax()]
+        else:
+            print("The model with minimum %s (%s) is the %s th model" % (objective, result[result.argmin()], result.argmin()+1))
+            return models[result.argmin()]
 
 class BinaryEvaluator(BaseEvaluator):
     """
@@ -208,17 +264,16 @@ class BinaryEvaluator(BaseEvaluator):
         eval_y : ndarray
             The test data's labels.
 
-        metrics : string, optional (default="all")
-            The metrics for evaluating the model. If "base", return only common metrics. If "all", return
-            plots including ROC curve, Precision_Recall vs threshold, class probability distribution and
+        plot : bool (default=True)
+            If "Flase", return only common metrics. If "True", return the plots including
+            ROC curve, Precision_Recall vs threshold, class probability distribution and
             feature importance as well.
 
         save : bool, optional (default=False)
-            Whether to save the result.
+            Whether to save the result or not.
 
         save_folder : string (default="result")
             The folder path to save the result, default is the result folder in the current directory.
-
         """
         accuracy, recall_1, precision_1, recall_0, precision_0, f1, roc_auc, confusion = self.get_metrics(model, eval_X, eval_y, threshold)
         print("Evaluation result of Threshold=={thres}".format(thres=threshold))
@@ -318,15 +373,19 @@ class BinaryEvaluator(BaseEvaluator):
             
 
     def ThresGridSearch(self, model, eval_X, eval_y, thres_list=None, objective=None):
-        """show the result of common metrics of given thresholds.
+        """Show the result of common metrics of given thresholds grid.
 
         Parameters
         ----------
-        thres_list : list (default="all")
-        
+        thres_list : list (default="None")
+            If no threshold list is given, it uses default grid:
+            [0.3, 0.4, 0.5, 0.6, 0.7], else, uses the given threshold
+            grid list.
+ 
         objective : list (default=None)
-                    Possible choices are 'Accuracy', 'recall_1',
-                    'precision_1', 'recall_0', 'precision_0', 'f1'
+            Sort the result by given metrics result.
+            Possible choices are 'accuracy', 'recall_1',
+            precision_1', 'recall_0', 'precision_0', 'f1'.
         """
         accuracy_list = []
         recall_1_list = []
@@ -349,29 +408,50 @@ class BinaryEvaluator(BaseEvaluator):
             roc_auc_list.append(roc_auc)
             confusion_list.append(confusion)
         data = np.array([thres_list, accuracy_list, recall_1_list, precision_1_list, recall_0_list, precision_0_list, f1_list, roc_auc_list]).T
-        self.df = pd.DataFrame(data, columns=["Threshold", "Accuracy", "recall_1", "precision_1", "recall_0", "precision_0", "f1","roc_auc"])
+        self.df = pd.DataFrame(data, columns=["Threshold", "accuracy", "recall_1", "precision_1", "recall_0", "precision_0", "f1","roc_auc"])
         if objective:
             self.df = self.df.sort_values(by=objective)
         display(self.df)
     
     
-    def find_best_model(self, models, eval_X=None, eval_y=None, objective=None):
-        pass
-#         result = np.array([])
-#         for model in models:
-#             y_pred = model.predict(eval_X)
-#             if objective == "accuracy":
-#                 result = np.append(result, mean_squared_error(eval_y, y_pred))
-#             if objective == "recall_1":
-#                 result = np.append(result, mean_absolute_error(eval_y, y_pred))
-#             if objective == "precision_1":
-#                 result = np.append(result, np.sqrt(mean_squared_error(eval_y, y_pred)))
-#             if objective == "recall_0":
-#                 result = np.append(result, self.rmsle(y_pred, eval_y))
-#             if objective == "precision_0":
-#                 result = np.append(result, r2_score(eval_y, y_pred))
-#                 print("The model with minimum %s (%s) is the %s th model" % (objective, result[result.argmin()],result.argmin()+1))
-#                 return models[result.argmin()]
-#             if objective == "f1":
-#                 print("The model with minimum %s (%s) is the %s th model" % (objective, result[result.argmin()],result.argmin()+1))
-#                 return models[result.argmax()]
+    def find_best_model(self, models, eval_X=None, eval_y=None, objective="accuracy", threshold=0.5):
+        """Find the best model with the specified objective metrics on given 
+        threshold.
+
+        Parameters
+        ----------
+        model : sklearn/lightgbm/xgboost/catboost classification model object
+            The model for evaluation.
+
+        eval_X : ndarray or pd.DataFrame
+            The test data's features.
+
+        eval_y : ndarray
+            The test data's labels.
+            
+        objective: string (default="accuracy")
+            The search goal     
+            
+        threshold: float (default=0.5)
+        
+        Returns
+        -------
+        A single model object.
+        """
+        result = np.array([])
+        for model in models:
+            accuracy, recall_1, precision_1, recall_0, precision_0, f1, _, _ = self.get_metrics(model, eval_X, eval_y, threshold)
+            if objective == "accuracy":
+                result = np.append(result, accuracy)
+            if objective == "recall_1":
+                result = np.append(result, recall_1)
+            if objective == "precision_1":
+                result = np.append(result, precision_1)
+            if objective == "recall_0":
+                result = np.append(result, recall_0)
+            if objective == "precision_0":
+                result = np.append(result, precision_0)
+            if objective == "f1":
+                result = np.append(result, f1)
+        print("The model with maximum %s (%s) is the %s th model" % (objective, result[result.argmax()],result.argmax()+1))
+        return models[result.argmax()]
