@@ -1,15 +1,10 @@
 import numpy as np
 import pandas as pd
 import os
+from IPython.display import display, HTML
 import matplotlib.pyplot as plt
 plt.style.use("ggplot")
-from sklearn.metrics import (
-    precision_recall_curve, precision_score, f1_score, 
-    auc, accuracy_score,mean_squared_error, confusion_matrix, 
-    classification_report, roc_curve, roc_auc_score, 
-    recall_score, make_scorer
-)
-
+from sklearn.metrics import *
 
 class BaseEvaluator(object):
     """
@@ -27,6 +22,126 @@ class BaseEvaluator(object):
             os.makedirs(directory)
 
 
+class RegressionEvaluator(BaseEvaluator):
+    """
+    """
+    def __init__(self):
+        super(RegressionEvaluator, self).__init__()
+    
+    
+    def get_rmsle(self, predicted, real):
+        """Calculate Root Mean Squared Logarithmic Error (RMSLE)
+        """
+        sum=0.0
+        for x in range(len(predicted)):
+            p = np.log(predicted[x]+1)
+            r = np.log(real[x]+1)
+            sum = sum + (p - r)**2
+        return (sum/len(predicted))**0.5
+    
+    
+    def get_metrics(self, model, eval_X, eval_y):
+        """Calculate common metrics for regression problem
+        
+        Parameters
+        ----------
+        model : sklearn/lightgbm/xgboost/catboost regression model object
+            The model for evaluation.
+
+        eval_X : ndarray or pd.DataFrame
+            The test data's features.
+
+        eval_y : ndarray
+            The test data's labels.
+            
+        return :
+        
+        """
+        self.model = model
+        self.eval_y = eval_y
+        if isinstance(eval_X, pd.DataFrame):
+            eval_X = eval_X.values
+        
+        self.eval_X = eval_X
+        self.y_pred = model.predict(self.eval_X)
+        self.res = self.y_pred - self.eval_y
+        # metrics
+        self.mse = mean_squared_error(eval_y, self.y_pred)
+        self.mae = mean_absolute_error(eval_y, self.y_pred)
+        self.rmse = np.sqrt(self.mse)
+        self.rmsle = self.get_rmsle(self.y_pred, eval_y)
+        self.r2 = r2_score(eval_y, self.y_pred)
+    
+    
+    def res_fit_plot(self):
+        """Residual vs Fitted value plot"""
+        plt.scatter(self.y_pred, self.res, c='red')
+        plt.title("Residuals vs Fitted Values plot")
+        plt.xlabel("Fitted Values")
+        plt.ylabel("Residuals")
+        return plt
+    
+    def evaluate(self, model, eval_X, eval_y, plot=True, save=False, save_folder="result"):
+        self.get_metrics(model, eval_X, eval_y)
+        print("Evaluation Result")
+        print("---Common Metrics---")
+        print("The mse is %0.4f" % self.mse)
+        print("The mae for 1 is %0.4f" % self.mae)
+        print("The rmse for 1 is %0.4f" % self.rmse)
+        print("The rmsle for 0 is %0.4f" % self.rmsle)
+        print("The r-square for 0 is %0.4f" % self.r2)
+        if plot:
+            fig = self.res_fit_plot()
+        if save:
+            super(RegressionEvaluator, self).ensure_path(save_folder)
+            plot_path = save_folder + 'residual_vs_fittedval.png'
+            if fig:
+                fig.savefig(
+                    plot_path,
+                    bbox_inches='tight'
+                )
+            #Write result into a txt
+            output = '\n'.join([
+                '--Model Evaluation--',
+                '\tmse: {mse:.4f}',
+                '\tmae: {mae:.4f}',
+                '\trmse: {rmse:.4f}',
+                '\trmsle: {rmsle:.4f}',
+                '\tr-square: {r2:.4f}',
+                '\n'
+            ]).format(
+                mse = self.mse,
+                mae = self.mae,
+                rmse = self.rmse,
+                rmsle = self.rmsle,
+                r2 = self.r2
+            )
+            result_path = save_folder + 'reg_output.txt'
+            with open(result_path, 'w+') as f:
+                f.write(output)
+            
+    
+    def find_best_model(self, models, eval_X=None, eval_y=None, objective=None):
+        result = np.array([])
+        for model in models:
+            y_pred = model.predict(eval_X)
+            if objective == "mse":
+                result = np.append(result, mean_squared_error(eval_y, y_pred))
+            if objective == "mae":
+                result = np.append(result, mean_absolute_error(eval_y, y_pred))
+            if objective == "rmse":
+                result = np.append(result, np.sqrt(mean_squared_error(eval_y, y_pred)))
+            if objective == "rmsle":
+                result = np.append(result, self.rmsle(y_pred, eval_y))
+            if objective == "r2":
+                result = np.append(result, r2_score(eval_y, y_pred))
+                print("The model with minimum %s (%s) is the %s th model" % (objective, result[result.argmin()],result.argmin()+1))
+                return models[result.argmin()]
+            if objective != "r2":
+                print("The model with minimum %s (%s) is the %s th model" % (objective, result[result.argmin()],result.argmin()+1))
+                return models[result.argmax()]
+
+
 class BinaryEvaluator(BaseEvaluator):
     """
     For binary classification problem, generate common evaluation metrics
@@ -35,10 +150,52 @@ class BinaryEvaluator(BaseEvaluator):
     """
     def __init__(self):
         super(BinaryEvaluator, self).__init__()
-
         
-    def evaluate(self, model, eval_X, eval_y, threshold=0.5, metrics = "all", save=False, save_folder="result"):
-        """Make prediction and evaluation based on specified threshold.
+        
+    def get_metrics(self, model, eval_X, eval_y, threshold=0.5):
+        """Calculate common metrics for binary classification problem"
+        
+        Parameters
+        ----------
+        model : sklearn/lightgbm/xgboost/catboost classification model object
+            The model for evaluation.
+
+        eval_X : ndarray or pd.DataFrame
+            The test data's features.
+
+        eval_y : ndarray
+            The test data's labels.
+        
+        threshold : int or float 
+            The threshold to determine the predicted label
+        """
+        self.model = model
+        self.eval_y = eval_y
+        if isinstance(eval_X, pd.DataFrame):
+            eval_X = eval_X.values
+            X_cols = X.columns
+        self.eval_X = eval_X
+        y_probs = model.predict_proba(eval_X)[:, 1]
+        self.y_probs = y_probs
+        if threshold == 0.5:
+            pred = model.predict(eval_X)
+        else:
+            pred = np.where(y_probs>threshold, 1, 0)       
+        accuracy = accuracy_score(pred, eval_y)
+        recall_1 = recall_score(eval_y, pred, pos_label=1)
+        precision_1 = precision_score(eval_y, pred, pos_label=1)
+        recall_0 = recall_score(eval_y, pred, pos_label=0)
+        precision_0 = precision_score(eval_y, pred, pos_label=0)
+        f1 = f1_score(eval_y, pred, pos_label=1)
+        roc_auc = roc_auc_score(eval_y, y_probs)
+        y_true = pd.Series(eval_y)
+        y_pred = pd.Series(pred)
+        confusion = pd.crosstab(y_true, y_pred, rownames=['True'], colnames=['Predicted'], margins=True)
+        return accuracy, recall_1, precision_1, recall_0, precision_0, f1, roc_auc, confusion
+        
+        
+    def evaluate(self, model, eval_X, eval_y, threshold=0.5, plot=True, save=False, save_folder="result"):
+        """Make prediction and generate evaluation report based on specified threshold.
 
         Parameters
         ----------
@@ -63,40 +220,22 @@ class BinaryEvaluator(BaseEvaluator):
             The folder path to save the result, default is the result folder in the current directory.
 
         """
-        if isinstance(eval_X, pd.DataFrame):
-            eval_X = eval_X.values
-            X_cols = X.columns
-        y_probs = model.predict_proba(eval_X)[:, 1]
-        if threshold == 0.5:
-            pred = model.predict(eval_X)
-        else:
-            pred = np.where(y_probs>threshold, 1, 0)       
-        accuracy  = accuracy_score(pred, eval_y)
-        recall_1    = recall_score(eval_y, pred, pos_label=1)
-        precision_1 = precision_score(eval_y, pred, pos_label=1)
-        recall_0    = recall_score(eval_y, pred, pos_label=0)
-        precision_0 = precision_score(eval_y, pred, pos_label=0)
-        f1        = f1_score(eval_y, pred, pos_label=1)
-        roc_auc       = roc_auc_score(eval_y, y_probs)
-        y_true = pd.Series(eval_y)
-        y_pred = pd.Series(pred)
-        confusion = pd.crosstab(y_true, y_pred, rownames=['True'], colnames=['Predicted'], margins=True)
-        if metrics == "basic" or metrics == "all":
-            print("Evaluation result of Threshold=={thres}".format(thres=threshold))
-            print("---Common Metrics---")
-            print("The accuracy is %0.4f" % accuracy)
-            print("The recall for 1 is %0.4f" % recall_1)
-            print("The precision for 1 is %0.4f" % precision_1)
-            print("The recall for 0 is %0.4f" % recall_0)
-            print("The precision for 0 is %0.4f" % precision_0)
-            print("The F1-score is %0.4f" % f1)
-            print("The ROC-AUC is %0.4f" % roc_auc)
-            print("\n---Confusion Matrix---")
-            print(confusion)
-        if metrics == "all":
+        accuracy, recall_1, precision_1, recall_0, precision_0, f1, roc_auc, confusion = self.get_metrics(model, eval_X, eval_y, threshold)
+        print("Evaluation result of Threshold=={thres}".format(thres=threshold))
+        print("---Common Metrics---")
+        print("The accuracy is %0.4f" % accuracy)
+        print("The recall for 1 is %0.4f" % recall_1)
+        print("The precision for 1 is %0.4f" % precision_1)
+        print("The recall for 0 is %0.4f" % recall_0)
+        print("The precision for 0 is %0.4f" % precision_0)
+        print("The F1-score is %0.4f" % f1)
+        print("The ROC-AUC is %0.4f" % roc_auc)
+        print("\n---Confusion Matrix---")
+        print(confusion)
+        if plot:
             # AUC
-            fpr, tpr, auc_thresholds = roc_curve(eval_y, y_probs)
-            precisions, recalls, thresholds = precision_recall_curve(eval_y, y_probs)
+            fpr, tpr, auc_thresholds = roc_curve(eval_y, self.y_probs)
+            precisions, recalls, thresholds = precision_recall_curve(eval_y, self.y_probs)
 
             # ROC
             fig = plt.figure(figsize=(10, 27))
@@ -124,9 +263,9 @@ class BinaryEvaluator(BaseEvaluator):
             ax3.set_title('Class Probability Distribution')
             ax3.set_ylabel('Density')
             ax3.set_xlabel('Predicted Probability')
-            ax3.hist(y_probs[eval_y == 1], bins=40,
+            ax3.hist(self.y_probs[eval_y == 1], bins=40,
                            density=True, alpha=0.5)
-            ax3.hist(y_probs[eval_y == 0], bins=40,
+            ax3.hist(self.y_probs[eval_y == 0], bins=40,
                               density=True, alpha=0.5)
             
             # Feature importance
@@ -141,7 +280,7 @@ class BinaryEvaluator(BaseEvaluator):
                     pd.Series(feature_importance, index=range(eval_X.shape[1])).nlargest(eval_X.shape[1]).plot(kind='barh')
                     ax4.set_ylabel('Column Index')
                 else:
-                    pd.Series(feature_importance, index=X_cols).nlargest(eval_X.shape[1]).plot(kind='barh')
+                    pd.Series(feature_importance, index=X_cols).nlargest(eval_X.shape[1]).plot(kind='barh', color = range(eval_X.shape[1]))
         if save:
             super(BinaryEvaluator, self).ensure_path(save_folder)
             plot_path = save_folder + 'multiple_metrics_plots.png'
@@ -173,23 +312,66 @@ class BinaryEvaluator(BaseEvaluator):
                 roc_auc = roc_auc,
                 confusion = confusion
             )
-            result_path = save_folder + 'output.txt'
+            result_path = save_folder + 'clf_output.txt'
             with open(result_path, 'w+') as f:
                 f.write(output)
             
 
-    def find_threshold(self, start=0, stop=1, step=0.1):
-        """show the result of common metrics of the threshold within a given interval.
+    def ThresGridSearch(self, model, eval_X, eval_y, thres_list=None, objective=None):
+        """show the result of common metrics of given thresholds.
 
         Parameters
         ----------
-        start : int or float
-            The start point of the threshold.
-
-        end : int or float
-            The end point of the threshold.
-
-        step: float
-            The increment step of the threshold.
+        thres_list : list (default="all")
+        
+        objective : list (default=None)
+                    Possible choices are 'Accuracy', 'recall_1',
+                    'precision_1', 'recall_0', 'precision_0', 'f1'
         """
+        accuracy_list = []
+        recall_1_list = []
+        precision_1_list = []
+        recall_0_list = []
+        precision_0_list = []
+        f1_list = []
+        roc_auc_list = []
+        confusion_list = []
+        if thres_list == None:
+            thres_list = np.arange(0.3, 0.7, 0.1)
+        for thres in thres_list:
+            accuracy, recall_1, precision_1, recall_0, precision_0, f1, roc_auc, confusion = self.get_metrics(model, eval_X, eval_y, thres)
+            accuracy_list.append(accuracy)
+            recall_1_list.append(recall_1)
+            precision_1_list.append(precision_1)
+            recall_0_list.append(recall_0)
+            precision_0_list.append(precision_0)
+            f1_list.append(f1)
+            roc_auc_list.append(roc_auc)
+            confusion_list.append(confusion)
+        data = np.array([thres_list, accuracy_list, recall_1_list, precision_1_list, recall_0_list, precision_0_list, f1_list, roc_auc_list]).T
+        self.df = pd.DataFrame(data, columns=["Threshold", "Accuracy", "recall_1", "precision_1", "recall_0", "precision_0", "f1","roc_auc"])
+        if objective:
+            self.df = self.df.sort_values(by=objective)
+        display(self.df)
+    
+    
+    def find_best_model(self, models, eval_X=None, eval_y=None, objective=None):
         pass
+#         result = np.array([])
+#         for model in models:
+#             y_pred = model.predict(eval_X)
+#             if objective == "accuracy":
+#                 result = np.append(result, mean_squared_error(eval_y, y_pred))
+#             if objective == "recall_1":
+#                 result = np.append(result, mean_absolute_error(eval_y, y_pred))
+#             if objective == "precision_1":
+#                 result = np.append(result, np.sqrt(mean_squared_error(eval_y, y_pred)))
+#             if objective == "recall_0":
+#                 result = np.append(result, self.rmsle(y_pred, eval_y))
+#             if objective == "precision_0":
+#                 result = np.append(result, r2_score(eval_y, y_pred))
+#                 print("The model with minimum %s (%s) is the %s th model" % (objective, result[result.argmin()],result.argmin()+1))
+#                 return models[result.argmin()]
+#             if objective == "f1":
+#                 print("The model with minimum %s (%s) is the %s th model" % (objective, result[result.argmin()],result.argmin()+1))
+#                 return models[result.argmax()]

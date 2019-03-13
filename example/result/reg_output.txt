@@ -1,0 +1,7 @@
+--Model Evaluation--
+	mse: 3424.3167
+	mae: 46.1742
+	rmse: 58.5177
+	rmsle: 0.4084
+	r-square: 0.3322
+
