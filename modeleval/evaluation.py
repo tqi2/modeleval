@@ -192,10 +192,10 @@ class RegressionEvaluator(BaseEvaluator):
             if objective == "r2":
                 result = np.append(result, r2_score(eval_y, y_pred))
         if objective == "r2":
-            print("The model with maximum r-square (%s) is the %s th model" % (result[result.argmin()], result.argmin()+1))
+            print("The model with maximum r-square (%s) is the %s th model" % (result.max(), result.argmax()+1))
             return models[result.argmax()]
         else:
-            print("The model with minimum %s (%s) is the %s th model" % (objective, result[result.argmin()], result.argmin()+1))
+            print("The model with minimum %s (%s) is the %s th model" % (objective, result.min(), result.argmin()+1))
             return models[result.argmin()]
 
 class BinaryEvaluator(BaseEvaluator):
