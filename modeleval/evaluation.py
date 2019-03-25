@@ -36,13 +36,11 @@ class RegressionEvaluator(BaseEvaluator):
         
         Parameters
         ----------
-        predicted : 
+        predicted : ndarray
+	    The predicted response.
 
         real : ndarray
             The real response.
-
-        eval_y : ndarray
-            The predicted response.
         
         Returns
         -------
